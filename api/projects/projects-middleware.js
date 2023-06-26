@@ -1,39 +1,34 @@
 // add middlewares here related to projects
-function validateProjectId(req, res, next) {
-  const { id } = req.params;
+const { get } = require("./projects-model");
 
-  Projects.getById(id)
+async function checkProjectId(req, res, next) {
+  get(req.params.id)
     .then((project) => {
       if (project) {
         req.project = project;
         next();
       } else {
-        res.status(404).json({ message: "Project not found" });
+        next({
+          status: 404,
+          message: "user not found",
+        });
       }
     })
-    .catch((error) => {
-      res.status(500).json({ message: "Error retrieving project", error });
-    });
+    .catch(next);
 }
 
-function validateActionId(req, res, next) {
-  const { id } = req.params;
-
-  Actions.getById(id)
-    .then((action) => {
-      if (action) {
-        req.action = action;
-        next();
-      } else {
-        res.status(404).json({ message: "Action not found" });
-      }
-    })
-    .catch((error) => {
-      res.status(500).json({ message: "Error retrieving action", error });
+async function checkProject(req, res, next) {
+  if (!req.body.name || !req.body.description) {
+    next({
+      status: 400,
+      message: "please complete all fields",
     });
+  } else {
+    next();
+  }
 }
 
 module.exports = {
-  validateProjectId,
-  validateActionId,
+  checkProjectId,
+  checkProject,
 };

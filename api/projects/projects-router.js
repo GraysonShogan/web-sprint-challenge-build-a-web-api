@@ -1,116 +1,67 @@
-// [GET] /api/projects
-router.get("/", (req, res) => {
-  Projects.get()
-    .then((projects) => {
-      res.json(projects);
-    })
-    .catch((error) => {
-      res.status(500).json({ message: "Error retrieving projects", error });
+const express = require("express");
+const Projects = require("./projects-model");
+const router = express.Router();
+const { checkProjectId, checkProject } = require("./projects-middleware");
+
+router.get("/", async (req, res, next) => {
+  try {
+    const projects = await Projects.get();
+    res.json(projects);
+  } catch (err) {
+    res.status(500).json({
+      message: "There are no projects to return",
     });
-});
-
-// [GET] /api/projects/:id
-router.get("/:id", (req, res) => {
-  const { id } = req.params;
-
-  Projects.getById(id)
-    .then((project) => {
-      if (project) {
-        res.json(project);
-      } else {
-        res.status(404).json({ message: "Project not found" });
-      }
-    })
-    .catch((error) => {
-      res.status(500).json({ message: "Error retrieving project", error });
-    });
-});
-
-// [POST] /api/projects
-router.post("/", (req, res) => {
-  const { name, description } = req.body;
-
-  if (!name || !description) {
-    res.status(400).json({ message: "Name and description are required" });
-    return;
   }
-
-  const newProject = { name, description };
-
-  Projects.insert(newProject)
-    .then((project) => {
-      res.status(201).json(project);
-    })
-    .catch((error) => {
-      res.status(500).json({ message: "Error creating project", error });
-    });
 });
 
-// [PUT] /api/projects/:id
+router.get("/:id", checkProjectId, async (req, res, next) => {
+  await Projects.get(req.params.id)
+    .then((project) => res.json(project))
+    .catch(next);
+});
+
+router.post("/", checkProjectId, checkProject, async (req, res, next) => {
+  const newPost = req.body;
+  await Projects.insert(newPost)
+    .then((post) => {
+      res.json(post);
+    })
+    .catch(next);
+});
+
 router.put("/:id", (req, res) => {
+  const { name, description, completed } = req.body;
   const { id } = req.params;
-  const { name, description } = req.body;
-
-  if (!name || !description) {
-    res.status(400).json({ message: "Name and description are required" });
-    return;
+  if (!name || !description || !completed) {
+    res.status(400).json(req.body);
   }
 
-  Projects.getById(id)
+  const changes = { name, description, completed };
+  Projects.update(id, changes)
+    .then((project) => res.status(200).json(project))
     .then((project) => {
-      if (project) {
-        const updatedProject = { ...project, name, description };
-
-        Projects.update(id, updatedProject)
-          .then(() => {
-            res.json(updatedProject);
-          })
-          .catch((error) => {
-            res.status(500).json({ message: "Error updating project", error });
-          });
-      } else {
-        res.status(404).json({ message: "Project not found" });
-      }
+      return project;
     })
-    .catch((error) => {
-      res.status(500).json({ message: "Error retrieving project", error });
-    });
+    .catch((error) => console.log(error));
 });
 
-// [DELETE] /api/projects/:id
-router.delete("/:id", (req, res) => {
-  const { id } = req.params;
-
-  Projects.remove(id)
-    .then((count) => {
-      if (count > 0) {
-        res.status(204).end();
-      } else {
-        res.status(404).json({ message: "Project not found" });
-      }
-    })
-    .catch((error) => {
-      res.status(500).json({ message: "Error deleting project", error });
-    });
+router.delete("/:id", checkProjectId, (req, res, next) => {
+  Projects.remove(req.params.id)
+    .then((project) => res.json())
+    .catch(next);
 });
 
-// [GET] /api/projects/:id/actions
-router.get("/:id/actions", (req, res) => {
-  const { id } = req.params;
+router.get("/:id/actions", checkProjectId, (req, res, next) => {
+  Projects.getProjectActions(req.params.id)
+    .then((project) => res.json(project))
+    .catch(next);
+});
 
-  Projects.getProjectActions(id)
-    .then((actions) => {
-      if (actions.length > 0) {
-        res.json(actions);
-      } else {
-        res.json([]);
-      }
-    })
-    .catch((error) => {
-      res
-        .status(500)
-        .json({ message: "Error retrieving project actions", error });
-    });
+router.use((err, req, res, next) => {
+  res.status(err.status || 500).json({
+    message: err.message,
+    stack: err.stack,
+  });
 });
 
 module.exports = router;
